@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: soap-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: soap-proxy
+  template:
+    metadata:
+      labels:
+        app: soap-proxy
+    spec:
+      securityContext:
+        fsGroup: 65532
+      initContainers:
+        - name: fix-perms
+          image: alpine:3.20
+          command: ["sh", "-c", "chown -R 65532:65532 /data"]
+          volumeMounts:
+            - name: traces
+              mountPath: /data
+      containers:
+        - name: proxy
+          image: your-registry/soap-proxy:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+          env:
+            - name: UPSTREAM_URL
+              value: "https://actual.soap.endpoint.example.com/soap"
+            - name: PROXY_LISTEN
+              value: ":8080"
+            - name: UI_LISTEN
+              value: ":8081"
+            - name: MAX_TRACES
+              value: "50000"
+            - name: TRACE_FILE
+              value: "/data/traces.jsonl"
+            - name: MTLS_CERT_FILE
+              value: "/certs/tls.crt"
+            - name: MTLS_KEY_FILE
+              value: "/certs/tls.key"
+            - name: MTLS_CA_FILE
+              value: "/certs/ca.crt"
+          ports:
+            - name: proxy
+              containerPort: 8080
+            - name: ui
+              containerPort: 8081
+          volumeMounts:
+            - name: mtls
+              mountPath: /certs
+              readOnly: true
+            - name: traces
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: proxy
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: proxy
+            initialDelaySeconds: 10
+            periodSeconds: 20
+      volumes:
+        - name: mtls
+          secret:
+            secretName: soap-proxy-mtls
+        - name: traces
+          persistentVolumeClaim:
+            claimName: soap-proxy-traces
