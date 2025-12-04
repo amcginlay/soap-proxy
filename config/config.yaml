@@ -1,1 +1,6 @@
-foo: Bar
+# Optional SOAPAction/XPath hooks. Leave all fields empty in an entry to disable it.
+hooks:
+  - soapAction: ""
+    xpath: ""
+    endpoint: ""
+    timeoutSeconds: 5

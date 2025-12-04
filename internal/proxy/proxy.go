@@ -24,8 +24,6 @@ func getenv(key, def string) string {
 
 // Run starts the proxy and UI servers.
 func Run(cfg *config.Config) error {
-	log.Printf("config Foo=%s", cfg.Foo)
-
 	upstreamStr := getenv("UPSTREAM_URL", "https://downstream.example.com/soap")
 	proxyListen := getenv("PROXY_LISTEN", ":8080")
 	uiListen := getenv("UI_LISTEN", ":8081")
@@ -37,6 +35,11 @@ func Run(cfg *config.Config) error {
 	caFile := getenv("MTLS_CA_FILE", "/certs/ca.crt")
 
 	upstreamURL, err := url.Parse(upstreamStr)
+	if err != nil {
+		return err
+	}
+
+	actionHooks, err := newActionHooks(cfg.Hooks)
 	if err != nil {
 		return err
 	}
@@ -53,7 +56,7 @@ func Run(cfg *config.Config) error {
 		return err
 	}
 
-	loggingTransport := NewLoggingTransport(baseTransport, store)
+	loggingTransport := NewLoggingTransport(baseTransport, store, actionHooks)
 
 	rp := &httputil.ReverseProxy{
 		Director: func(req *http.Request) {

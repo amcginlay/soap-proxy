@@ -4,4 +4,8 @@ metadata:
   name: soap-proxy-config
 data:
   config.yaml: |
-    foo: Bar
+    hooks:
+      - soapAction: ""
+        xpath: ""
+        endpoint: ""
+        timeoutSeconds: 5

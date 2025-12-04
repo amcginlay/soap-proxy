@@ -20,8 +20,9 @@ const maxBodySize = 1 << 20 // 1MB
 
 // LoggingTransport wraps a RoundTripper to capture requests and responses.
 type LoggingTransport struct {
-    Base  http.RoundTripper
-    Store *storage.FileTraceStore
+	Base  http.RoundTripper
+	Store *storage.FileTraceStore
+	Hooks []*ActionHook
 }
 
 // NewMTLSTransport creates an http.RoundTripper using mTLS to the upstream.
@@ -48,8 +49,8 @@ func NewMTLSTransport(certFile, keyFile, caFile string) (http.RoundTripper, erro
 }
 
 // NewLoggingTransport constructs a LoggingTransport.
-func NewLoggingTransport(base http.RoundTripper, store *storage.FileTraceStore) *LoggingTransport {
-    return &LoggingTransport{Base: base, Store: store}
+func NewLoggingTransport(base http.RoundTripper, store *storage.FileTraceStore, hooks []*ActionHook) *LoggingTransport {
+	return &LoggingTransport{Base: base, Store: store, Hooks: hooks}
 }
 
 // extractSOAPAction tries, in order:
@@ -57,8 +58,8 @@ func NewLoggingTransport(base http.RoundTripper, store *storage.FileTraceStore) 
 // 2) The first element name inside <...:Body> in the XML request body.
 func extractSOAPAction(headers http.Header, body []byte) string {
     if headers != nil {
-        if h := headers.Get("SOAPAction"); h != "" {
-            return strings.Trim(h, "\""")
+		if h := headers.Get("SOAPAction"); h != "" {
+			return strings.Trim(h, `"`)
         }
     }
     if len(body) == 0 {
@@ -152,6 +153,12 @@ func (t *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
     }
     entry.SizeRespBytes = len(respBytes)
 
-    _ = t.Store.Add(entry)
-    return resp, nil
+	for _, h := range t.Hooks {
+		if h != nil {
+			h.MaybeHandle(soapAction, respBytes)
+		}
+	}
+
+	_ = t.Store.Add(entry)
+	return resp, nil
 }
