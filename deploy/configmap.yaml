@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: soap-proxy-config
+data:
+  config.yaml: |
+    foo: Bar
